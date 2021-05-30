@@ -10,7 +10,8 @@ import numpy as np
 import copy
 import os
 import time
-
+from rich import print
+# check https://rich.readthedocs.io/en/latest/appendix/colors.html?highlight=colors to use colors you want on displaying data
 # hyperparameters
 epoches=25
 batch_size=128
@@ -27,7 +28,7 @@ image_datasets = {x: torchvision.datasets.CIFAR10(root='./data', train=True,down
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=4, shuffle=True, num_workers=4) for x in ['train', 'val']}
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
 class_names = image_datasets['train'].classes
-print(class_names)
+print(f"classes: {class_names}")
 
 ## -> net and training
 criterion = nn.CrossEntropyLoss()
@@ -40,15 +41,15 @@ device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cp
 model.to(device)
 start = time.time()
 for epoch in range(epoches):  # loop over the dataset multiple times
-    print(f"epoch: {epoch} / {(epoches-1)}")
+    print(f"\nepoch: {epoch} / {(epoches-1)}")
     print("----------")
     for phase in ["train","val"]:
         if phase == "train":
             model.train()
-            description="Training..."
+            description="[bold gold3]Training...  [/bold gold3]"
         else:
             model.eval()
-            description="Validating..."
+            description="[bold blue_violet]Validating...[/bold blue_violet]"
         running_loss = 0.0
         running_corrects = 0
         for inputs,labels in track(dataloaders[phase],description=description):
@@ -77,7 +78,7 @@ for epoch in range(epoches):  # loop over the dataset multiple times
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc =running_corrects.double()/ dataset_sizes[phase]
             
-        print(f"{phase} - Loss : {loss:.4f}   Acc: {epoch_acc:.4f}")
+        print(f"[bold]Loss[/bold] : {loss:.4f}   [bold]Acc[/bold]: {epoch_acc:.4f}")
         if phase=="val" and epoch_acc > best_acc:
             best_acc = epoch_acc
             best_model_wts = copy.deepcopy(model.state_dict())
