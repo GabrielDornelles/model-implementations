@@ -8,7 +8,7 @@ from model import model
 from rich.progress import track
 import numpy as np
 import copy
-import os 
+import os
 import time
 
 # hyperparameters
@@ -36,7 +36,7 @@ optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)# Stochastic Gr
 
 best_model_wts = copy.deepcopy(model.state_dict())
 best_acc = 0.0
-device = torch.device("cuda")
+device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 model.to(device)
 start = time.time()
 for epoch in range(epoches):  # loop over the dataset multiple times
