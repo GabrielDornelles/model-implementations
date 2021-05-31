@@ -25,7 +25,7 @@ transform = transforms.Compose(
 
 # feels like its working
 image_datasets = {x: torchvision.datasets.CIFAR10(root='./data', train=True if x=="train" else False ,download=True , transform=transform) for x in ['train','val']}
-dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=4, shuffle=True, num_workers=4) for x in ['train', 'val']}
+dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=4) for x in ['train', 'val']}
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
 class_names = image_datasets['train'].classes
 print(f"classes: {class_names}")
