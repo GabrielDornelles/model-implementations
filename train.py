@@ -24,7 +24,7 @@ transform = transforms.Compose(
      transforms.Normalize((0.485, 0.485, 0.406), (0.229, 0.224, 0.225))])
 
 # feels like its working
-image_datasets = {x: torchvision.datasets.CIFAR10(root='./data', train=True,download=True if x=="train" else False, transform=transform) for x in ['train','val']}
+image_datasets = {x: torchvision.datasets.CIFAR10(root='./data', train=True if x=="train" else False ,download=True , transform=transform) for x in ['train','val']}
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=4, shuffle=True, num_workers=4) for x in ['train', 'val']}
 dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
 class_names = image_datasets['train'].classes
