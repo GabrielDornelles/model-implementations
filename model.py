@@ -1,56 +1,69 @@
-import torch.nn as nn
-import torch.nn.functional as F
+
 import torch
+from torch import nn
+from torch.nn import functional as F
+from torch.utils.data import DataLoader
+from torch.utils.data import random_split
+from torchvision.datasets import CIFAR100
+from torchvision import transforms, models
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import RichProgressBar
+from torchmetrics.functional import accuracy
 
-class Net(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.conv1 = nn.Conv2d(3, 6, 5)
-        self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 5 * 5, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 10)
+class LitResNet(pl.LightningModule):
 
-    def forward(self, x):
-        x = self.pool(F.relu(self.conv1(x)))
-        x = self.pool(F.relu(self.conv2(x)))
-        x = torch.flatten(x, 1) # flatten all dimensions except batch
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
+	def __init__(self):
+		super().__init__()
+		self.model = models.resnet18(pretrained=False, num_classes=100)
+		self.model.conv1 = nn.Conv2d(3, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)	
+		self.model.maxpool = nn.Identity()
 
-class model(nn.Module):
-  def __init__(self):
-    super().__init__()
+	def forward(self, x):
+		out = self.model(x)
+		return F.log_softmax(out, dim=1)
 
-    self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=(3,3))
-    self.conv2 = nn.Conv2d(32, 32, (3, 3))
-    self.activation = nn.ReLU()
-    self.bnorm = nn.BatchNorm2d(num_features=32)
-    self.pool = nn.MaxPool2d(kernel_size = (2,2))
-    self.flatten = nn.Flatten()
+	def configure_optimizers(self):
+		optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+		return optimizer
+	
+	def evaluate(self, batch, stage = None):
+		x, y = batch
+		logits = self(x)
+		loss = F.nll_loss(logits, y)
+		preds = torch.argmax(logits, dim=1)
+		acc = accuracy(preds, y)
 
-    # output = (input - filter + 1) / stride
-    # conv 1: (28 - 3 + 1) / 1 = 26x26
-    # pooling 1: 13x13
-    # conv 2: (13 - 3 + 1) / 1 = 11x11
-    # pooling 2: 5x5
-    # 5 * 5 * 32
-    # 800 -> 128 -> 128 -> 10
-    self.linear1 = nn.Linear(in_features=32*6*6, out_features=128)
-    self.linear2 = nn.Linear(128, 128)
-    self.output = nn.Linear(128, 35)
-    self.dropout = nn.Dropout(p = 0.2)
+		if stage:
+			self.log(f"{stage}_loss", loss, prog_bar=True)
+			self.log(f"{stage}_acc", acc, prog_bar=True)
 
-  def forward(self, X):
-    X = self.pool(self.bnorm(self.activation(self.conv1(X))))
-    X = self.pool(self.bnorm(self.activation(self.conv2(X))))
-    X = self.flatten(X)
+	def training_step(self, train_batch, batch_idx):
+		x, y = train_batch
+		out = self(x)
+		loss = F.nll_loss(out,y)
+		self.log('train_loss', loss)
+		return loss
+	
+	def validation_step(self, batch, batch_idx):
+		self.evaluate(batch, "val")
 
-    X = self.dropout(self.activation(self.linear1(X)))
-    X = self.dropout(self.activation(self.linear2(X)))
-    X = self.output(X)
+	def test_step(self, batch, batch_idx):
+		# there's no test but if you want simple call evaluate like that
+		self.evaluate(batch, "test")
 
-    return X
+# data
+dataset = CIFAR100(root='./',train=True, download=True, transform=transforms.ToTensor())
+train_size = int(len(dataset) * 0.9)
+val_size = int(len(dataset) - train_size)
+cifar_train, cifar_val = random_split(dataset, [train_size, val_size])
+
+train_loader = DataLoader(cifar_train, batch_size=32, num_workers=4)
+val_loader = DataLoader(cifar_val, batch_size=32, num_workers=4)
+
+# model
+model = LitResNet()
+
+# training
+trainer = pl.Trainer(gpus=1, num_nodes=1, precision=16, limit_train_batches=0.01, callbacks=RichProgressBar())
+trainer.fit(model, train_loader, val_loader)
+    
